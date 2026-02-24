@@ -1,32 +1,32 @@
 package KafkaFeeder.Service.KafkaService;
 
 import KafkaFeeder.model.AutoMessage;
+import KafkaFeeder.model.ManualMessage;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
-public class KafkaProducer implements Runnable {
-
-    private final ObjectMapper objectMapper;
+public class KafkaProducer {
+    private final ObjectMapper mapper;
     private final KafkaTemplate<String, String> kafkaTemplate;
-    private AutoMessage message;
 
-    public KafkaProducer(ObjectMapper objectMapper, KafkaTemplate<String, String> kafkaTemplate) {
-        this.objectMapper = objectMapper;
+    public KafkaProducer(KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper) {
         this.kafkaTemplate = kafkaTemplate;
+        mapper = objectMapper;
     }
 
-    @Override
-    public void run() {
-        while (true) {
-            try {
-                kafkaTemplate.send(message.topic(), message.key(), objectMapper.writeValueAsString(message));
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
+    public void send(ManualMessage message) {
+        String payload = mapper.writeValueAsString(message.value());
 
-        }
+        ProducerRecord<String, String> record =
+                new ProducerRecord<>(message.topic(), message.key(), payload);
+
+        // Adicionando headers
+        message.headers().headers().forEach((k,v)-> record.headers().add(new RecordHeader(k, v.getBytes())));
+        kafkaTemplate.send(record);
     }
 }
